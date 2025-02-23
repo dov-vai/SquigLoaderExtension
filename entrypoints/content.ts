@@ -3,6 +3,7 @@ export default defineContentScript({
     'https://*.squig.link/*',
     'https://graph.hangout.audio/*'
   ],
+  world: "MAIN",
   main() {
     const ADD_BUTTON_CLASS = "add-phone-button";
     const BUTTON_COLOR = "var(--background-color-contrast-more)";
@@ -138,7 +139,6 @@ export default defineContentScript({
             phoneObj.brand = brandObj;
 
             try {
-                // FIXME: allPhones not found (so will be the other page variables)
                 const phoneIndex = allPhones.findIndex(
                     (p: any) => p.dispBrand === phoneObj.dispBrand && p.dispName === phoneObj.dispName
                 );
