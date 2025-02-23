@@ -56,9 +56,9 @@ export default defineContentScript({
         return expandButton;
     }
 
-    function addFauxnItemsToParent(fauxnItem: any, siteUrl: any, files: any) {
+    function addFauxnItemsToParent(fauxnItem: HTMLElement, siteUrl: string, files: string[]) {
         const clonedItem = fauxnItem.cloneNode(true);
-        const parent = fauxnItem.parentNode;
+        const parent = fauxnItem.parentNode!;
 
         const linksContainer = document.createElement('div');
         linksContainer.style.display = 'none';
@@ -74,17 +74,17 @@ export default defineContentScript({
             expanded = !expanded;
         });
 
-        files.forEach((file: any) => {
-            const newFauxnItem = clonedItem.cloneNode(true);
+        files.forEach(file => {
+            const newFauxnItem = clonedItem.cloneNode(true) as HTMLElement;
             
-            const brand = fauxnItem.getAttribute('name').split(': ')[0];
+            const brand = fauxnItem.getAttribute('name')!.split(': ')[0];
             newFauxnItem.setAttribute('name', `${brand}: ${file}`);
 
             // remove the old cloned button
-            const button = newFauxnItem.querySelector(`button.${ADD_BUTTON_CLASS}`);
+            const button = newFauxnItem.querySelector(`button.${ADD_BUTTON_CLASS}`) as Node;
             newFauxnItem.removeChild(button);
 
-            const newFauxnLink = newFauxnItem.querySelector('a.fauxn-link');
+            const newFauxnLink = newFauxnItem.querySelector('a.fauxn-link') as HTMLLinkElement;
             newFauxnLink.href = `${siteUrl}?share=${file.replace(/ /g, "_")}`;
             newFauxnLink.textContent = file;
 
@@ -95,12 +95,12 @@ export default defineContentScript({
         parent.insertBefore(linksContainer, fauxnItem.nextSibling);
     }
 
-    function addShowPhoneButton(fauxnItem: any, phoneBookLoaded: any) {
+    function addShowPhoneButton(fauxnItem: HTMLElement, phoneBookLoaded: boolean) {
         const addButton = createAddButton()
         fauxnItem.appendChild(addButton);
 
-        const [brandName, phoneName] = fauxnItem.getAttribute('name').split(': ').map((s: any) => s.trim());
-        const fauxnLink = fauxnItem.querySelector('a.fauxn-link');
+        const [brandName, phoneName] = fauxnItem.getAttribute('name')!.split(': ').map(s => s.trim());
+        const fauxnLink = fauxnItem.querySelector('a.fauxn-link') as HTMLLinkElement;
         const siteUrl = fauxnLink.href.split('/?share=')[0] + '/';
         const fileName = fauxnLink.href.split('/?share=')[1].replace(/_/g, " ");
 
@@ -111,7 +111,7 @@ export default defineContentScript({
             if (!phoneBookLoaded){
                 findFilesInPhoneBook(siteUrl, fileName)
                 .then(files => {
-                    files = files.filter((file: any) => file != fileName);
+                    files = files.filter(file => file != fileName);
                     if (files.length > 0) {
                         addFauxnItemsToParent(fauxnItem, siteUrl, files);
                     }
@@ -146,13 +146,13 @@ export default defineContentScript({
                 if (phoneIndex === -1) {
                     await loadExternalFile(phoneObj, siteUrl, fileName);
                     allPhones.push(phoneObj);
-                    handleShowPhone(phoneObj, false, null, null);
+                    handleShowPhone(phoneObj, false, undefined, undefined);
                     addButton.textContent = '–';
                     return;
                 }
                 // if it exists, reference the already created phoneObj
                 phoneObj = allPhones[phoneIndex];
-                phoneObj.active ? removePhone(phoneObj) : handleShowPhone(phoneObj, false, null, null);
+                phoneObj.active ? removePhone(phoneObj) : handleShowPhone(phoneObj, false, undefined, undefined);
                 addButton.textContent = phoneObj.active ? REMOVE_SYMBOL : ADD_SYMBOL;
             } catch (error) {
                 console.error('Error loading data for', phoneName, error);
@@ -177,18 +177,18 @@ export default defineContentScript({
         }
     }
 
-    function interpolateData(channelFiles: any) {
-        return channelFiles.map((data: any) => {
+    function interpolateData(channelFiles: string[]) {
+        return channelFiles.map(data => {
             if (data) {
                 const parsedData = tsvParse(data);
                 return Equalizer.interp(f_values, parsedData);
             } else {
                 return null;
             }
-        }).filter((channel: any) => channel !== null);
+        }).filter(channel => channel !== null);
     }
 
-    function fetchFile(url: any, channelFiles: any, fileName: any){
+    function fetchFile(url: string, channelFiles: string[], fileName: string){
         return fetch(url)
         .then(response => {
             if (!response.ok) {
@@ -197,6 +197,7 @@ export default defineContentScript({
             return response.text();
         })
         .then(data => {
+            console.log("channel file", data);
             channelFiles.push(data);
         })
         .catch(error => {
@@ -205,7 +206,7 @@ export default defineContentScript({
         })
     }
 
-    async function findFilesInPhoneBook(siteUrl: any, fileName: any) {
+    async function findFilesInPhoneBook(siteUrl: string, fileName: string): Promise<string[]> {
         const phoneBookUrl = `${siteUrl}data/phone_book.json`;
       
         try {
@@ -238,15 +239,15 @@ export default defineContentScript({
         }
     }
 
-    async function loadExternalFile(phoneObj: any, siteUrl: any, fileName: any) {
+    async function loadExternalFile(phoneObj: any, siteUrl: string, fileName: string) {
         if (phoneObj.rawChannels) {
             console.log("Data already loaded for:", phoneObj.dispName);
             return; // do nothing if data is already loaded
         }
 
-        const channelFiles: any = [];
-        const promises = [];
-        const retryPromises: any = [];
+        const channelFiles: string[] = [];
+        const promises: Promise<void>[] = [];
+        const retryPromises: Promise<void>[] = [];
 
         for (const channel of ["L", "R"]) {
             const fullFileName = `${fileName} ${channel}.txt`;
@@ -288,9 +289,8 @@ export default defineContentScript({
             if (mutation.type === 'childList') {
                 mutation.addedNodes.forEach(node => {
                     // FIXME: classList does exist, why is typescript showing an error?
-                    // @ts-ignore
-                    if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('fauxn-item')) {
-                        addShowPhoneButton(node, false);
+                    if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).classList.contains('fauxn-item')) {
+                        addShowPhoneButton(node as HTMLElement, false);
                     }
                 });
             }
